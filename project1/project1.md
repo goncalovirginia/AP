@@ -12,7 +12,7 @@ The datasets are divided into train and test. There is a dataloader that can be 
 
 In this assignment, you will need to complete the following tasks:
 
-Create an MLP architecture to learn the main type of Pokemon in each image (Multiclass classification). Train the model and evaluate it. Explain how you discovered the best architecture and what regularization, optimizers, etc you used.
-Create a CNN architecture for the same purpose, train it, and evaluate it. Compare the MLP's performance and capacity.
-Use pre-trained models for transfer learning and fine-tuning for this task.
-Try data augmentation techniques, and regularization to overcome data imbalances and model overfitting.
+- Create an MLP architecture to learn the main type of Pokemon in each image (Multiclass classification). Train the model and evaluate it. Explain how you discovered the best architecture and what regularization, optimizers, etc you used.
+- Create a CNN architecture for the same purpose, train it, and evaluate it. Compare the MLP's performance and capacity.
+- Use pre-trained models for transfer learning and fine-tuning for this task.
+- Try data augmentation techniques, and regularization to overcome data imbalances and model overfitting.
