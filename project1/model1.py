@@ -99,7 +99,7 @@ print('Finished Training')
 # Save model
 
 current_datetime = datetime.now()
-torch.save(cnn.state_dict(), 'project1/models/CNN{current_datetime}.pth')
+torch.save(cnn.state_dict(), 'project1/saved_models/CNN-{current_datetime}.pth')
 
 # Predictions
 
@@ -108,4 +108,4 @@ y_predict = "y_predict";
 # Save y_predict in .csv
 
 submission = pd.DataFrame({'Id': test_dataset.img_labels.iloc[:, 0], 'main_type': y_predict})
-submission.to_csv('submission.csv', index=False)
+submission.to_csv('project1/predictions/submission-{current_datetime}.csv', index=False)
