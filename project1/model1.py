@@ -9,57 +9,65 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
 import CustomImageDataset as CID
+from CustomImageDataset import imshow
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from datetime import datetime
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f'Device: {device}')
+
 # Constants
 
 IMAGES_PATH = "project1/images/"
 BATCH_SIZE = 8
+IMG_DIMENSIONS = (300, 400)
+NUM_LABELS = 16
 
-# Load the train dataset
+# Preprocess
 
-train_dataset = CID.CustomImageDataset(annotations_file=IMAGES_PATH+'train.csv', img_dir=IMAGES_PATH+'train/')#, transform=preprocess)
+preprocess = transforms.Compose([
+    transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+])
+
+# Training dataset
+
+train_dataset = CID.CustomImageDataset(annotations_file=IMAGES_PATH+'train.csv', img_dir=IMAGES_PATH+'train/', transform=preprocess)
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-# Load the test dataset
+# Testing dataset
 
-test_dataset = CID.CustomImageDataset(annotations_file=IMAGES_PATH+'test.csv', img_dir=IMAGES_PATH+'test/')#, transform=preprocess)
+test_dataset = CID.CustomImageDataset(annotations_file=IMAGES_PATH+'test.csv', img_dir=IMAGES_PATH+'test/', transform=preprocess)
 test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
 # Show some images
 
-def imshow(img):
-    img = img / 2 + 0.5 # Unnormalize
-    npimg = img.numpy()
-    plt.imshow(np.transpose(npimg, (1, 2, 0)))
-    plt.show()
-
 dataiter = iter(train_loader)
 images, labels = next(dataiter)
 imshow(torchvision.utils.make_grid(images))
+print('Batch labels:')
 print(' '.join(f'{labels[j]}    ' for j in range(BATCH_SIZE)))
 
 # CNN Model
 
 class CNN(nn.Module):
+
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(3, 6, 5)
+        self.conv1 = nn.Conv2d(3, 292, 9)
         self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(16 * 5 * 5, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 10)
+        self.conv2 = nn.Conv2d(292, 284, 9)
+        self.fc1 = nn.Linear(284 * 9 * 9, 256)
+        self.fc2 = nn.Linear(256, 128)
+        self.fc3 = nn.Linear(128, NUM_LABELS)
 
     def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
+        x = self.pool(F.leaky_relu(self.conv1(x)))
+        x = self.pool(F.leaky_relu(self.conv2(x)))
         x = torch.flatten(x, 1) # flatten all dimensions except batch
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
+        x = F.leaky_relu(self.fc1(x))
+        x = F.leaky_relu(self.fc2(x))
         x = self.fc3(x)
         return x
 
@@ -73,9 +81,8 @@ optimizer = optim.SGD(cnn.parameters(), lr=0.001, momentum=0.9)
 # Training
 
 for epoch in range(2):  # loop over the dataset multiple times
-
     running_loss = 0.0
-    for i, data in enumerate(trainloader, 0):
+    for i, data in enumerate(train_loader, 0):
         # get the inputs; data is a list of [inputs, labels]
         inputs, labels = data
 
@@ -83,7 +90,7 @@ for epoch in range(2):  # loop over the dataset multiple times
         optimizer.zero_grad()
 
         # forward + backward + optimize
-        outputs = net(inputs)
+        outputs = cnn(inputs)
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()

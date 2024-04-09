@@ -138,19 +138,13 @@ class CustomImageDataset(Dataset):
                 out.append(self.classes[idx])
             return out
     
-
-
-        
-    
-
 def imshow(img):
     img = img / 2 + 0.5     # unnormalize
-    npimg = img.numpy()
+    npimg = img.numpy().astype(np.uint8)
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
     plt.show()
 
 if __name__ == '__main__':
-
     # Test the CustomImageDataset class
     train_dataset = CustomImageDataset(annotations_file='./superimposed_images/train.csv', img_dir='./superimposed_images/train/')
     train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
