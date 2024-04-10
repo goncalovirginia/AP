@@ -15,6 +15,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from datetime import datetime
+import torch.utils.data
 
 # Settings
 
@@ -35,15 +36,18 @@ preprocess = transforms.Compose([
     transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 ])
 
-# Training dataset
+# Training and validation datasets
 
 train_dataset = CID.CustomImageDataset(annotations_file=IMAGES_PATH+'train.csv', img_dir=IMAGES_PATH+'train/', transform=preprocess)
+train_dataset, validation_dataset = torch.utils.data.random_split(train_dataset, [0.8, 0.2])
+
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
+validation_loader = DataLoader(validation_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
 
-# Testing dataset
+# Predict dataset
 
-test_dataset = CID.CustomImageDataset(annotations_file=IMAGES_PATH+'test_formatted.csv', img_dir=IMAGES_PATH+'test/', transform=preprocess)
-test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
+#predict_dataset = CID.CustomImageDataset(annotations_file=IMAGES_PATH+'test_formatted.csv', img_dir=IMAGES_PATH+'test/', transform=preprocess)
+#predict_loader = DataLoader(predict_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True)
 
 # Model
 
@@ -52,24 +56,24 @@ class CNN(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.conv1 = nn.Conv2d(in_channels=3, out_channels=16, kernel_size=5)
+        self.conv1 = nn.Conv2d(in_channels=3, out_channels=128, kernel_size=5)
         self.pool1 = nn.MaxPool2d(2, 2)
 
-        self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=5)
+        self.conv2 = nn.Conv2d(in_channels=128, out_channels=256, kernel_size=5)
         self.pool2 = nn.MaxPool2d(2, 2)
 
-        self.conv3 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3)
+        self.conv3 = nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3)
         self.pool3 = nn.MaxPool2d(2, 2)
 
         self.flatten = nn.Flatten()
 
-        self.fc1 = nn.Linear(in_features=128, out_features=96)
-        #self.drop1 = nn.Dropout(p=0.3)
+        self.fc1 = nn.Linear(in_features=842240, out_features=1024)
+        self.drop1 = nn.Dropout(p=0.2)
 
-        self.fc2 = nn.Linear(in_features=96, out_features=64)
-        #self.drop2 = nn.Dropout(p=0.3)
+        self.fc2 = nn.Linear(in_features=1024, out_features=512)
+        self.drop2 = nn.Dropout(p=0.2)
 
-        self.out = nn.Linear(in_features=64, out_features=18)
+        self.out = nn.Linear(in_features=512, out_features=18)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -88,11 +92,11 @@ class CNN(nn.Module):
 
         x = self.fc1(x)
         x = F.leaky_relu(x)
-        #x = self.drop1(x)
+        x = self.drop1(x)
 
         x = self.fc2(x)
         x = F.leaky_relu(x)
-        #x = self.drop2(x)
+        x = self.drop2(x)
 
         x = self.out(x)
 
@@ -110,7 +114,6 @@ optimizer = optim.Adam(cnn.parameters(), lr=0.0001)
 
 def train_epoch():
     cnn.train(True)
-
     running_loss = 0.0
     running_accuracy = 0.0
 
@@ -128,9 +131,9 @@ def train_epoch():
         loss.backward()
         optimizer.step()
 
-        if batch_index % 500 == 499:  # print every 500 batches
-            avg_loss_across_batches = running_loss / 500
-            avg_acc_across_batches = (running_accuracy / 500) * 100
+        if batch_index % 5 == 4:  # print every 5 batches
+            avg_loss_across_batches = running_loss / 5
+            avg_acc_across_batches = (running_accuracy / 5) * 100
             print('Batch {0}, Loss: {1:.3f}, Accuracy: {2:.1f}%'.format(batch_index+1, avg_loss_across_batches, avg_acc_across_batches))
             running_loss = 0.0
             running_accuracy = 0.0
@@ -142,18 +145,18 @@ def validate_epoch():
     running_loss = 0.0
     running_accuracy = 0.0
 
-    for i, data in enumerate(test_loader):
+    for i, data in enumerate(validation_loader):
         inputs, labels = data[0].to(device), data[1].to(device)
 
         with torch.no_grad():
-            outputs = cnn(inputs) # shape: [batch_size, 10]
+            outputs = cnn(inputs)
             correct = torch.sum(labels == torch.argmax(outputs, dim=1)).item()
             running_accuracy += correct / BATCH_SIZE
             loss = criterion(outputs, labels) # One number, the average batch loss
             running_loss += loss.item()
 
-    avg_loss_across_batches = running_loss / len(test_loader)
-    avg_acc_across_batches = (running_accuracy / len(test_loader)) * 100
+    avg_loss_across_batches = running_loss / len(validation_loader)
+    avg_acc_across_batches = (running_accuracy / len(validation_loader)) * 100
 
     print('Val Loss: {0:.3f}, Val Accuracy: {1:.1f}%\n'.format(avg_loss_across_batches, avg_acc_across_batches))
 
