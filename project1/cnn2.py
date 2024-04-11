@@ -16,7 +16,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from datetime import datetime
 import torch.utils.data
-from torch.nn import Linear, ReLU, LeakyReLU, CrossEntropyLoss, Sequential, Conv2d, MaxPool2d, Module, Softmax, BatchNorm2d, Dropout, Flatten
+from torch.nn import Linear, ReLU, LeakyReLU, LayerNorm, CrossEntropyLoss, Sequential, Conv2d, MaxPool2d, Module, Softmax, BatchNorm2d, Dropout, Flatten
 from torch.optim import Adam
 
 # Settings
@@ -30,13 +30,13 @@ IMAGES_PATH = "project1/images/"
 IMG_DIMENSIONS = (300, 400)
 NUM_LABELS = 18
 BATCH_SIZE = 32
-NUM_EPOCHS = 2
+NUM_EPOCHS = 10
 
 # Preprocess
 
 preprocess = transforms.Compose([
-    #transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-    transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    #transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 ])
 
 # Training and validation datasets
@@ -49,11 +49,48 @@ validation_loader = DataLoader(validation_dataset, batch_size=BATCH_SIZE, shuffl
 # Model
 
 class CNN(nn.Module):
+    
+    def __init__(self):
+        super().__init__()
+
+        self.convolutional_layers = Sequential(
+            LayerNorm(IMG_DIMENSIONS),
+
+            Conv2d(3, 32, 5),
+            ReLU(32),
+            BatchNorm2d(32),
+            MaxPool2d(2, 2),
+
+            Conv2d(32, 64, 5),
+            ReLU(64),
+            BatchNorm2d(64),
+            MaxPool2d(2, 2),
+        )
+
+        self.fully_connected_layers = Sequential(
+            Flatten(),
+            Linear(446976, 256),
+            ReLU(256),
+            Dropout(0.2),
+            Linear(256, 128),
+            ReLU(128),
+            Linear(128, NUM_LABELS),
+        )
+
+    def forward(self, x):
+        x = self.convolutional_layers(x)
+        x = self.fully_connected_layers(x)
+        return x
+
+'''
+class CNN(nn.Module):
 
     def __init__(self):
         super().__init__()
 
         self.convolutional_layers = Sequential(
+            LayerNorm(IMG_DIMENSIONS),
+
             Conv2d(3, 96, 9, 4),
             LeakyReLU(inplace=True),
             MaxPool2d(3, 2),
@@ -72,7 +109,7 @@ class CNN(nn.Module):
             LeakyReLU(inplace=True),
             MaxPool2d(3, 2),
 
-            Dropout(0.2)
+            Dropout(0.2),
         )
 
         self.fully_connected_layers = Sequential(
@@ -89,14 +126,50 @@ class CNN(nn.Module):
         x = self.fully_connected_layers(x)
         return x
 
+class CNN(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+        self.convolutional_layers = Sequential(
+            LayerNorm(IMG_DIMENSIONS),
+
+            Conv2d(3, 64, 9),
+            LeakyReLU(inplace=True),
+            BatchNorm2d(64),
+            MaxPool2d(3, 2),
+
+            Conv2d(64, 96, 5),
+            LeakyReLU(inplace=True),
+            BatchNorm2d(96),
+
+            Conv2d(96, 64, 3),
+            LeakyReLU(inplace=True),
+            BatchNorm2d(64),
+            MaxPool2d(3, 2),
+        )
+
+        self.fully_connected_layers = Sequential(
+            Flatten(),
+            Linear(95040, 2048),
+            LeakyReLU(inplace=True),
+            Linear(2048, 512),
+            Linear(512, NUM_LABELS),
+        )
+
+    def forward(self, x):
+        x = self.convolutional_layers(x)
+        x = self.fully_connected_layers(x)
+        return x
+'''
 cnn = CNN()
 cnn.to(device)
 
 # Loss function and optimizer
 
 criterion = nn.CrossEntropyLoss()
-#optimizer = optim.Adam(cnn.parameters(), lr=0.0001)
-optimizer = optim.SGD(cnn.parameters(), lr=0.00001, momentum=0.9)
+optimizer = optim.Adam(cnn.parameters(), lr=0.0001)
+#optimizer = optim.SGD(cnn.parameters(), lr=0.0001, momentum=0.9)
 
 # Training
 
