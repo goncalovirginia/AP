@@ -30,7 +30,7 @@ IMAGES_PATH = "project1/images/"
 IMG_DIMENSIONS = (300, 400)
 NUM_LABELS = 18
 BATCH_SIZE = 32
-NUM_EPOCHS = 5
+NUM_EPOCHS = 2
 
 # Preprocess
 
@@ -72,14 +72,12 @@ class CNN(nn.Module):
 
             Conv2d(256, 256, 3),
             ReLU(inplace=True),
-            Conv2d(256, 256, 3),
-            ReLU(inplace=True),
             MaxPool2d(2, 2),
         )
 
         self.linear_layers = Sequential(
             Flatten(),
-            Linear(13824, 1024),
+            Linear(17920, 1024),
             Linear(1024, 512),
             Linear(512, NUM_LABELS)
         )
