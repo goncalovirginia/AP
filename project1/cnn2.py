@@ -29,7 +29,7 @@ print(f'Device: {device}\n')
 IMAGES_PATH = "project1/images/"
 IMG_DIMENSIONS = (300, 400)
 NUM_LABELS = 18
-BATCH_SIZE = 16
+BATCH_SIZE = 32
 NUM_EPOCHS = 5
 
 # Preprocess
@@ -54,27 +54,34 @@ class CNN(nn.Module):
         super().__init__()
 
         self.conv_layers = Sequential(
-            Conv2d(3, 32, 5),
+            Conv2d(3, 64, 5),
             ReLU(inplace=True),
             MaxPool2d(2, 2),
 
-            Conv2d(32, 64, 5),
+            Conv2d(64, 64, 5),
             ReLU(inplace=True),
             MaxPool2d(2, 2),
             
-            Conv2d(64, 128, 3),
+            Conv2d(64, 128, 5),
             ReLU(inplace=True),
             MaxPool2d(2, 2),
 
-            Conv2d(128, 128, 3),
+            Conv2d(128, 256, 3),
+            ReLU(inplace=True),
+            MaxPool2d(2, 2),
+
+            Conv2d(256, 256, 3),
+            ReLU(inplace=True),
+            Conv2d(256, 256, 3),
             ReLU(inplace=True),
             MaxPool2d(2, 2),
         )
 
         self.linear_layers = Sequential(
             Flatten(),
-            Linear(45056, 4096),
-            Linear(4096, NUM_LABELS)
+            Linear(13824, 1024),
+            Linear(1024, 512),
+            Linear(512, NUM_LABELS)
         )
 
     def forward(self, x):
@@ -88,8 +95,8 @@ cnn.to(device)
 # Loss function and optimizer
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(cnn.parameters(), lr=0.0001)
-#optimizer = optim.SGD(cnn.parameters(), lr=0.0001, momentum=0.9)
+#optimizer = optim.Adam(cnn.parameters(), lr=0.0001)
+optimizer = optim.SGD(cnn.parameters(), lr=0.0001, momentum=0.9)
 
 # Training
 
@@ -183,11 +190,10 @@ def predict_submission(model):
         for i, data in enumerate(predict_loader):
             inputs, labels = data[0].to(device), data[1].to(device)
 
-            predictions = model(inputs).cpu().data.numpy()
+            _, predictions = torch.max(model(inputs).cpu(), 1)
 
             for prediction in predictions:
-                predicted_label = np.argmax(prediction)
-                predictedLabelsDataframe.loc[len(predictedLabelsDataframe)] = [predicted_label]
+                predictedLabelsDataframe.loc[len(predictedLabelsDataframe)] = [prediction.item()]
 
     idDataframe = pd.read_csv('project1/images/test_formatted.csv').rename(columns={'image_id':'Id'})
     IdMainTypeDataframe = idDataframe.join(predictedLabelsDataframe)
@@ -198,5 +204,5 @@ def predict_submission(model):
 
 val_accuracy = train()
 save_model(cnn, val_accuracy)
-#cnn = load_model('CNN2-0.14329268292682926.pth')
+#cnn = load_model('CNN2-0.13109756097560976.pth')
 predict_submission(cnn)
