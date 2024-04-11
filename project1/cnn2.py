@@ -53,38 +53,40 @@ class CNN(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.conv_layers = Sequential(
-            Conv2d(3, 64, 5),
+        self.convolutional_layers = Sequential(
+            Conv2d(3, 96, 9, 4),
             ReLU(inplace=True),
-            MaxPool2d(2, 2),
+            MaxPool2d(3, 2),
 
-            Conv2d(64, 64, 5),
+            Conv2d(96, 256, 5, padding=2),
             ReLU(inplace=True),
-            MaxPool2d(2, 2),
+            MaxPool2d(3, 2),
             
-            Conv2d(64, 128, 5),
+            Conv2d(256, 384, 3, padding=1),
             ReLU(inplace=True),
-            MaxPool2d(2, 2),
 
-            Conv2d(128, 256, 3),
+            Conv2d(384, 384, 3, padding=1),
             ReLU(inplace=True),
-            MaxPool2d(2, 2),
 
-            Conv2d(256, 256, 3),
+            Conv2d(384, 256, 3, padding=1),
             ReLU(inplace=True),
-            MaxPool2d(2, 2),
+            MaxPool2d(3, 2),
+
+            Dropout(0.2)
         )
 
-        self.linear_layers = Sequential(
+        self.fully_connected_layers = Sequential(
             Flatten(),
-            Linear(17920, 1024),
-            Linear(1024, 512),
-            Linear(512, NUM_LABELS)
+            Linear(22528, 4096),
+            ReLU(inplace=True),
+            Dropout(0.2),
+            Linear(4096, 2048),
+            Linear(2048, NUM_LABELS),
         )
 
     def forward(self, x):
-        x = self.conv_layers(x)
-        x = self.linear_layers(x)
+        x = self.convolutional_layers(x)
+        x = self.fully_connected_layers(x)
         return x
 
 cnn = CNN()
@@ -94,7 +96,7 @@ cnn.to(device)
 
 criterion = nn.CrossEntropyLoss()
 #optimizer = optim.Adam(cnn.parameters(), lr=0.0001)
-optimizer = optim.SGD(cnn.parameters(), lr=0.0001, momentum=0.9)
+optimizer = optim.SGD(cnn.parameters(), lr=0.00001, momentum=0.9)
 
 # Training
 
