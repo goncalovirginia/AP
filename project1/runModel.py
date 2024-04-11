@@ -17,7 +17,7 @@ print(f'Device: {device}')
 # Constants
 
 IMAGES_PATH = "project1/images/"
-BATCH_SIZE = 8
+BATCH_SIZE = 16
 IMG_DIMENSIONS = (300, 400)
 NUM_LABELS = 18
 
