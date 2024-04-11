@@ -16,7 +16,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from datetime import datetime
 import torch.utils.data
-from torch.nn import Linear, ReLU, CrossEntropyLoss, Sequential, Conv2d, MaxPool2d, Module, Softmax, BatchNorm2d, Dropout, Flatten
+from torch.nn import Linear, ReLU, LeakyReLU, CrossEntropyLoss, Sequential, Conv2d, MaxPool2d, Module, Softmax, BatchNorm2d, Dropout, Flatten
 from torch.optim import Adam
 
 # Settings
@@ -55,21 +55,21 @@ class CNN(nn.Module):
 
         self.convolutional_layers = Sequential(
             Conv2d(3, 96, 9, 4),
-            ReLU(inplace=True),
+            LeakyReLU(inplace=True),
             MaxPool2d(3, 2),
 
             Conv2d(96, 256, 5, padding=2),
-            ReLU(inplace=True),
+            LeakyReLU(inplace=True),
             MaxPool2d(3, 2),
             
             Conv2d(256, 384, 3, padding=1),
-            ReLU(inplace=True),
+            LeakyReLU(inplace=True),
 
             Conv2d(384, 384, 3, padding=1),
-            ReLU(inplace=True),
+            LeakyReLU(inplace=True),
 
             Conv2d(384, 256, 3, padding=1),
-            ReLU(inplace=True),
+            LeakyReLU(inplace=True),
             MaxPool2d(3, 2),
 
             Dropout(0.2)
@@ -78,7 +78,7 @@ class CNN(nn.Module):
         self.fully_connected_layers = Sequential(
             Flatten(),
             Linear(22528, 4096),
-            ReLU(inplace=True),
+            LeakyReLU(inplace=True),
             Dropout(0.2),
             Linear(4096, 2048),
             Linear(2048, NUM_LABELS),
