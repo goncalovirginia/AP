@@ -8,6 +8,9 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
 
+IMAGE_FORMAT = '.jpg'
+BACKUP_FORMAT = '.png'
+
 class CustomImageDataset(Dataset):
 
     def __init__(self, annotations_file, img_dir, transform=transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), target_transform=None, task='classification'):
@@ -32,8 +35,15 @@ class CustomImageDataset(Dataset):
         return len(self.img_labels)
 
     def __getitem__(self, idx):
-        img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0]+'.png')
-        image = read_image(img_path).float()
+        img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0]+IMAGE_FORMAT)
+        image = 0
+
+        if (os.path.exists(img_path)):
+            image = read_image(img_path).float()
+        else:
+            img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0]+BACKUP_FORMAT)
+            image = read_image(img_path).float()
+
         if self.img_labels.main_type.iloc[idx] == 'test':
             label = -1
         if self.task == 'classification':
@@ -53,7 +63,7 @@ class CustomImageDataset(Dataset):
         return image, label
 
     def show(self, idx):    
-        img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0]+'.png')
+        img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0]+IMAGE_FORMAT)
         image = read_image(img_path)
         plt.imshow(image.permute(1, 2, 0))
         plt.axis('off')
@@ -69,7 +79,7 @@ class CustomImageDataset(Dataset):
         plt.show()
     
     def show_mask_overlay(self, idx):
-        img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0]+'.png')
+        img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0]+IMAGE_FORMAT)
         image = read_image(img_path)
         mask_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0]+'mask'+self.img_labels.iloc[idx, 0][-4:])
         mask = read_image(mask_path)
@@ -93,7 +103,7 @@ class CustomImageDataset(Dataset):
         fig, ax = plt.subplots(grid_sz,grid_sz, figsize=(10, 7))
         for i in range(min(batch_size,grid_sz*grid_sz)):
             if images == None:
-                img_path = os.path.join(self.img_dir, self.img_labels.iloc[i, 0]+'.png')
+                img_path = os.path.join(self.img_dir, self.img_labels.iloc[i, 0]+IMAGE_FORMAT)
                 image = read_image(img_path)
             else:
                 image = (images[i]- torch.min(images[i]))/(torch.max(images[i])-torch.min(images[i]))
@@ -138,13 +148,19 @@ class CustomImageDataset(Dataset):
                 out.append(self.classes[idx])
             return out
     
+
+
+        
+    
+
 def imshow(img):
     img = img / 2 + 0.5     # unnormalize
-    npimg = img.numpy().astype(np.uint8)
+    npimg = img.numpy()
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
     plt.show()
 
 if __name__ == '__main__':
+
     # Test the CustomImageDataset class
     train_dataset = CustomImageDataset(annotations_file='./superimposed_images/train.csv', img_dir='./superimposed_images/train/')
     train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
