@@ -19,13 +19,13 @@ def plot_board(file_name,board,text=None):
     plt.close()
 
 def snake_demo(actions):
-    game = SnakeGame(30,30,border=1)
+    game = SnakeGame(30,30,border=1, max_grass=10)
     board,reward,done,info = game.reset()    
     action_name = {-1:'Turn left',0:'Straight ahead',1:'Turn right'}    
-    plot_board('0.png',board,'Start')
+    plot_board('project2/images/0.png',board,'Start')
     for frame,action in enumerate(actions):
         board,reward,done,info = game.step(action)
-        plot_board(f'{frame+1}.png',board,action_name[action])
+        plot_board(f'project2/images/{frame+1}.png',board,action_name[action])
         
-snake_demo([0,1,0,-1])
+snake_demo([0,1,0,-1,0])
     
