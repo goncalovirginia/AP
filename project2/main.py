@@ -1,39 +1,44 @@
+import math
+import random
+import matplotlib
+import matplotlib.pyplot as plt
+from collections import namedtuple, deque
+from itertools import count
+
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from torch.nn import Linear, ReLU, LeakyReLU, Sequential, Flatten
 import torch.optim as optim
-import torch.cuda as cuda
+from torch.optim import AdamW
+import torch.nn.functional as F
 from snake_game import SnakeGame
 from collections import namedtuple, deque
+import random
+from game_demo import plot_game, plot_state
 
 # Constants
 
+USE_GPU = True
+N_OBSERVATIONS = 16 * 16 * 3
+N_ACTIONS = 3
+NUM_EPISODES = 1000
+MAX_STEPS = 1000
 BATCH_SIZE = 128
 GAMMA = 0.99
-EPS_START = 0.9
-EPS_END = 0.05
-EPS_DECAY = 1000
-TAU = 0.005
-LEARNING_RATE = 1e-4
+EPSILON_START = 0.9
+EPSILON_END = 0.05
+EPSILON_DECAY = 1000
+UPDATE_RATE = 0.005
+LEARNING_RATE = 0.0001
 
-# Models
+# GPU
 
-class DQN(nn.Module):
-    def __init__(self, n_observations, n_actions):
-        super(DQN, self).__init__()
-        self.layer1 = nn.Linear(n_observations, 128)
-        self.layer2 = nn.Linear(128, 128)
-        self.layer3 = nn.Linear(128, n_actions)
+device = torch.device("cuda" if USE_GPU and torch.cuda.is_available() else "cpu")
+print(f'Device: {device}')
 
-    def forward(self, x):
-        x = F.relu(self.layer1(x))
-        x = F.relu(self.layer2(x))
-        return self.layer3(x)   
+#Replay Memory
 
-
-#ReplayMemory
-Transition = namedtuple('Transition',
-                        ('state', 'action', 'next_state', 'reward'))
+Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 
 class ReplayMemory(object):
 
@@ -50,46 +55,158 @@ class ReplayMemory(object):
     def __len__(self):
         return len(self.memory)
 
+# Models
+
+class DQN(nn.Module):
+    def __init__(self, n_observations, n_actions):
+        super(DQN, self).__init__()
+
+        self.fully_connected_layers = Sequential(
+            Flatten(),
+            Linear(n_observations, 128),
+            LeakyReLU(128),
+            Linear(128, 128),
+            LeakyReLU(128),
+            Linear(128, 64),
+            LeakyReLU(64),
+            Linear(64, n_actions)
+        )
+
+    def forward(self, x):
+        x = self.fully_connected_layers(x)
+        return x 
+    
 # Training
 
-# Get number of actions from gym action space
-#n_actions = env.action_space.n (n tinhas acabado dei comment Sofia)
-# Get the number of state observations
-state, info = env.reset()
-n_observations = len(state)
-
-policy_net = DQN(n_observations, n_actions).to(device)
-target_net = DQN(n_observations, n_actions).to(device)
+policy_net = DQN(N_OBSERVATIONS, N_ACTIONS).to(device)
+target_net = DQN(N_OBSERVATIONS, N_ACTIONS).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 
-optimizer = optim.AdamW(policy_net.parameters(), lr=LEARNING_RATE, amsgrad=True)
+optimizer = AdamW(policy_net.parameters(), lr=LEARNING_RATE, amsgrad=True)
 memory = ReplayMemory(10000)
 
 steps_done = 0
+episode_durations = []
+episode_scores = []
 
-def train():
-    snakeGame = SnakeGame(width=16, height=16, food_amount=1, border=1, grass_growth=0.1, max_grass=20)
-    board = snakeGame.get_state()
-    done = False
+def select_action(state):
+    epsilon_threshold = EPSILON_END + (EPSILON_START - EPSILON_END) * math.exp(-1. * steps_done / EPSILON_DECAY)
 
-    while (not done):
-        # feed board into DQN model something something predict next move
-        nextMove = 0
-        board, reward, done, info = snakeGame.step(nextMove)
+    if random.random() > epsilon_threshold:
+        with torch.no_grad():
+            # t.max(1) will return the largest column value of each row.
+            # second column on max result is index of where max element was found, so we pick action with the larger expected reward.
+            return policy_net(state).max(1).indices.view(1, 1)
+    
+    return torch.tensor([[random.choice([0, 1, 2])]], device=device, dtype=torch.long)
 
-        # use variables for something
+def plot_info(show_result=False):
+    plt.figure(1)
+    #durations_t = torch.tensor(episode_durations, dtype=torch.float)
+    #scores_t = torch.tensor(episode_scores, dtype=torch.float)
+    if show_result:
+        plt.title('Result')
+    else:
+        plt.clf()
+        plt.title('Training...')
+    plt.xlabel('Episode')
+    plt.ylabel('Score')
+    plt.plot(episode_scores)
+    # Take 100 episode averages and plot them too
+    #if len(durations_t) >= 100:
+    #    means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
+    #    means = torch.cat((torch.zeros(99), means))
+    #    plt.plot(means.numpy())
 
-# Predict
+    plt.pause(10)
 
-def predict():
-    snakeGame = SnakeGame(width=16, height=16, food_amount=1, border=1, grass_growth=0.1, max_grass=20)
-    board = snakeGame.get_state()
-    done = False
+def optimize_model():
+    if len(memory) < BATCH_SIZE:
+        return
+    
+    transitions = memory.sample(BATCH_SIZE)
+    # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
+    # detailed explanation). This converts batch-array of Transitions
+    # to Transition of batch-arrays.
+    batch = Transition(*zip(*transitions))
 
-    while (not done):
-        # feed board into DQN model something something predict next move
-        nextMove = 0
-        board, reward, done, info = snakeGame.step(nextMove)
+    # Compute a mask of non-final states and concatenate the batch elements
+    # (a final state would've been the one after which simulation ended)
+    non_final_mask = torch.tensor(tuple(map(lambda s: s is not None, batch.next_state)), device=device, dtype=torch.bool)
+    non_final_next_states = torch.cat([s for s in batch.next_state if s is not None])
+    state_batch = torch.cat(batch.state)
+    action_batch = torch.cat(batch.action)
+    reward_batch = torch.cat(batch.reward)
 
-        # use variables for something
+    # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
+    # columns of actions taken. These are the actions which would've been taken
+    # for each batch state according to policy_net
+    state_action_values = policy_net(state_batch).gather(1, action_batch)
 
+    # Compute V(s_{t+1}) for all next states.
+    # Expected values of actions for non_final_next_states are computed based
+    # on the "older" target_net; selecting their best reward with max(1).values
+    # This is merged based on the mask, such that we'll have either the expected
+    # state value or 0 in case the state was final.
+    next_state_values = torch.zeros(BATCH_SIZE, device=device)
+    with torch.no_grad():
+        next_state_values[non_final_mask] = target_net(non_final_next_states).max(1).values
+    # Compute the expected Q values
+    expected_state_action_values = (next_state_values * GAMMA) + reward_batch
+
+    # Compute Huber loss
+    criterion = nn.SmoothL1Loss()
+    loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
+
+    # Optimize the model
+    optimizer.zero_grad()
+    loss.backward()
+    # In-place gradient clipping
+    torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
+    optimizer.step()
+
+def train(snakeGame):
+    for episode in range(NUM_EPISODES):
+        state, reward, done, info = snakeGame.reset()
+        state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
+
+        for step in range(MAX_STEPS):
+            action = select_action(state)
+            global steps_done
+            steps_done += 1
+            next_state, reward, done, info = snakeGame.step(action.item() - 1)
+
+            next_state = torch.tensor(next_state, dtype=torch.float32, device=device).unsqueeze(0)
+            if done:
+                next_state = None
+
+            reward = torch.tensor([reward], device=device)
+
+            memory.push(state, action, next_state, reward)
+
+            optimize_model()
+
+            # Soft update of the target network's weights
+            # θ′ ← τ θ + (1 −τ )θ′
+            target_net_state_dict = target_net.state_dict()
+            policy_net_state_dict = policy_net.state_dict()
+
+            for key in policy_net_state_dict:
+                target_net_state_dict[key] = policy_net_state_dict[key] * UPDATE_RATE + target_net_state_dict[key] * (1 - UPDATE_RATE)
+            
+            target_net.load_state_dict(target_net_state_dict)
+
+            state = next_state
+
+            if done:
+                print(f'Episode {episode}: {info}')
+                episode_durations.append(step + 1)
+                episode_scores.append(info.get('score'))
+                #plot_info()
+                break
+
+# Run stuff
+
+snakeGame = SnakeGame(width=14, height=14, food_amount=1, border=1, grass_growth=0.001, max_grass=0.05)
+
+train(snakeGame)

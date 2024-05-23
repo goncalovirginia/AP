@@ -8,17 +8,15 @@ from numpy.random import randint
 class SnakeGame:
     " Implements the snake game core"
 
-    def __init__(self, width, height, food_amount=1,
-                 border = 0, grass_growth = 0,
-                 max_grass = 0):
+    def __init__(self, width, height, food_amount=1, border = 0, grass_growth = 0, max_grass = 0):
         "Initialize board"
         self.width = width
         self.height = height
-        self.board = np.zeros( (height,width,3),dtype = np.float32)
+        self.board = np.zeros((height, width, 3), dtype = np.float32)
         self.food_amount = food_amount
         self.border = border
         self.grass_growth = grass_growth
-        self.grass = np.zeros( (height,width) ) + max_grass
+        self.grass = np.zeros((height, width)) + max_grass
         self.max_grass = max_grass
         self.reset()
 

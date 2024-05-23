@@ -9,6 +9,24 @@ Updated on Fri May 12 07:35:00 2023
 import matplotlib.pyplot as plt
 from snake_game import SnakeGame
 
+def plot_game(transitions):
+    plt.ion()
+    plt.figure(num=1, figsize=(5,5))
+
+    for transition in transitions:
+        plt.imshow(transition.state.cpu().numpy()[0])
+        plt.axis('off')
+        plt.pause(0.1)
+
+def plot_state(state):
+    plt.ion()
+    plt.figure(num=1, figsize=(5, 5))
+
+    plt.imshow(state.cpu().numpy()[0])
+    plt.axis('off')
+    plt.pause(0.05)
+    plt.gcf()
+
 def plot_board(file_name,board,text=None):
     plt.figure(figsize=(10,10))
     plt.imshow(board)
