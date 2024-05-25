@@ -7,7 +7,7 @@ from itertools import count
 
 import torch
 import torch.nn as nn
-from torch.nn import Linear, ReLU, LeakyReLU, Sequential, Flatten, Conv2d, MaxPool2d
+from torch.nn import LayerNorm, Linear, ReLU, LeakyReLU, Sequential, Flatten, Conv2d, MaxPool2d
 import torch.optim as optim
 from torch.optim import AdamW
 import torch.nn.functional as F
@@ -23,15 +23,15 @@ BOARD_WIDTH = 16
 BOARD_HEIGHT = 16
 N_OBSERVATIONS = BOARD_WIDTH * BOARD_HEIGHT * 3
 N_ACTIONS = 3
-NUM_EPISODES = 1000
+NUM_EPISODES = 10000
 MAX_STEPS = 1000
 BATCH_SIZE = 200
 GAMMA = 0.99
 EPSILON_START = 0.9
-EPSILON_END = 0.05
-EPSILON_DECAY = 1000
+EPSILON_END = 0.0
+EPSILON_DECAY = 50000
 UPDATE_RATE = 0.005
-LEARNING_RATE = 0.005
+LEARNING_RATE = 0.001
 REPLAY_MEMORY_CAPACITY = 10000
 
 # GPU
@@ -66,22 +66,20 @@ class DQN(nn.Module):
 
         self.convolutional_layers = Sequential(
             Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1),
-            ReLU(inplace=True),
             MaxPool2d(kernel_size=2, stride=2),
             
             Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding=1),
-            ReLU(inplace=True),
             MaxPool2d(kernel_size=2, stride=2),
         )
 
         self.fully_connected_layers = Sequential(
             Flatten(),
-            Linear(16 * 8, 32),
-            ReLU(inplace=True),
+            Linear(in_features=16 * 8, out_features=32),
+            LeakyReLU(),
             Linear(in_features=32, out_features=32),
-            ReLU(inplace=True),
+            LeakyReLU(),
             Linear(in_features=32, out_features=16),
-            ReLU(inplace=True),
+            LeakyReLU(),
             Linear(in_features=16, out_features=n_actions),
         )
 
@@ -121,7 +119,7 @@ def plot_info(show_result=False):
     plt.xlabel('Episode')
     plt.ylabel('Score')
     plt.plot(episode_scores)
-    plt.pause(10)
+    plt.show()
 
 def optimize_model():
     if len(memory) < BATCH_SIZE:
@@ -212,5 +210,11 @@ def train(snakeGame):
 snakeGame = SnakeGame(width=BOARD_WIDTH-2, height=BOARD_HEIGHT-2, food_amount=1, border=1, grass_growth=0.001, max_grass=0.05)
 
 train(snakeGame)
+
+episode_scores_second_half = episode_scores[NUM_EPISODES//2:]
+episode_scores_second_half_avg = sum(episode_scores_second_half) / (NUM_EPISODES//2)
+
+torch.save(policy_net.state_dict(), f"policy_net_avgscore{episode_scores_second_half_avg}.pth")
+torch.save(target_net.state_dict(), f"target_net_avgscore{episode_scores_second_half_avg}.pth")
 
 plot_info()
