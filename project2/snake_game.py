@@ -96,10 +96,11 @@ class SnakeGame:
             reward += self.grass[x,y]
             self.grass[x,y] = 0
             self.score+=reward
+            self.curr_step+=1
             self.grass += self.grass_growth 
             self.grass[self.grass>self.max_grass] = self.max_grass
                 
-        return self.board_state(),reward,self.done, {'score':self.score}
+        return self.board_state(),reward,self.done, {'step': self.curr_step, 'score':self.score}
 
     def get_state(self):
         "easily get current state (score, apple, snake head and tail)"        
@@ -133,6 +134,7 @@ class SnakeGame:
         "reset state"
         self.score = 0
         self.done = False
+        self.curr_step = 0
         self.create_snake()
         self.apples = []
         self.create_apples()

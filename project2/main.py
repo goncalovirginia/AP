@@ -7,7 +7,7 @@ from itertools import count
 
 import torch
 import torch.nn as nn
-from torch.nn import Linear, ReLU, LeakyReLU, Sequential, Flatten
+from torch.nn import Linear, ReLU, LeakyReLU, Sequential, Flatten, Conv2d, MaxPool2d
 import torch.optim as optim
 from torch.optim import AdamW
 import torch.nn.functional as F
@@ -19,17 +19,20 @@ from game_demo import plot_game, plot_state
 # Constants
 
 USE_GPU = True
-N_OBSERVATIONS = 16 * 16 * 3
+BOARD_WIDTH = 16
+BOARD_HEIGHT = 16
+N_OBSERVATIONS = BOARD_WIDTH * BOARD_HEIGHT * 3
 N_ACTIONS = 3
 NUM_EPISODES = 1000
 MAX_STEPS = 1000
-BATCH_SIZE = 128
+BATCH_SIZE = 200
 GAMMA = 0.99
 EPSILON_START = 0.9
 EPSILON_END = 0.05
 EPSILON_DECAY = 1000
 UPDATE_RATE = 0.005
-LEARNING_RATE = 0.0001
+LEARNING_RATE = 0.005
+REPLAY_MEMORY_CAPACITY = 10000
 
 # GPU
 
@@ -61,18 +64,30 @@ class DQN(nn.Module):
     def __init__(self, n_observations, n_actions):
         super(DQN, self).__init__()
 
+        self.convolutional_layers = Sequential(
+            Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1),
+            ReLU(inplace=True),
+            MaxPool2d(kernel_size=2, stride=2),
+            
+            Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding=1),
+            ReLU(inplace=True),
+            MaxPool2d(kernel_size=2, stride=2),
+        )
+
         self.fully_connected_layers = Sequential(
             Flatten(),
-            Linear(n_observations, 128),
-            LeakyReLU(128),
-            Linear(128, 128),
-            LeakyReLU(128),
-            Linear(128, 64),
-            LeakyReLU(64),
-            Linear(64, n_actions)
+            Linear(16 * 8, 32),
+            ReLU(inplace=True),
+            Linear(in_features=32, out_features=32),
+            ReLU(inplace=True),
+            Linear(in_features=32, out_features=16),
+            ReLU(inplace=True),
+            Linear(in_features=16, out_features=n_actions),
         )
 
     def forward(self, x):
+        x = torch.permute(x, (0, 3, 1, 2))
+        x = self.convolutional_layers(x)
         x = self.fully_connected_layers(x)
         return x 
     
@@ -83,7 +98,7 @@ target_net = DQN(N_OBSERVATIONS, N_ACTIONS).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 
 optimizer = AdamW(policy_net.parameters(), lr=LEARNING_RATE, amsgrad=True)
-memory = ReplayMemory(10000)
+memory = ReplayMemory(REPLAY_MEMORY_CAPACITY)
 
 steps_done = 0
 episode_durations = []
@@ -102,22 +117,10 @@ def select_action(state):
 
 def plot_info(show_result=False):
     plt.figure(1)
-    #durations_t = torch.tensor(episode_durations, dtype=torch.float)
-    #scores_t = torch.tensor(episode_scores, dtype=torch.float)
-    if show_result:
-        plt.title('Result')
-    else:
-        plt.clf()
-        plt.title('Training...')
+    plt.title('Episode Scores')
     plt.xlabel('Episode')
     plt.ylabel('Score')
     plt.plot(episode_scores)
-    # Take 100 episode averages and plot them too
-    #if len(durations_t) >= 100:
-    #    means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
-    #    means = torch.cat((torch.zeros(99), means))
-    #    plt.plot(means.numpy())
-
     plt.pause(10)
 
 def optimize_model():
@@ -202,11 +205,12 @@ def train(snakeGame):
                 print(f'Episode {episode}: {info}')
                 episode_durations.append(step + 1)
                 episode_scores.append(info.get('score'))
-                #plot_info()
                 break
 
 # Run stuff
 
-snakeGame = SnakeGame(width=14, height=14, food_amount=1, border=1, grass_growth=0.001, max_grass=0.05)
+snakeGame = SnakeGame(width=BOARD_WIDTH-2, height=BOARD_HEIGHT-2, food_amount=1, border=1, grass_growth=0.001, max_grass=0.05)
 
 train(snakeGame)
+
+plot_info()
