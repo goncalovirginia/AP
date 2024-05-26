@@ -25,9 +25,9 @@ N_OBSERVATIONS = BOARD_WIDTH * BOARD_HEIGHT * 3
 N_ACTIONS = 3
 NUM_EPISODES = 10000
 MAX_STEPS = 1000
-BATCH_SIZE = 200
+BATCH_SIZE = 128
 GAMMA = 0.99
-EPSILON_START = 0.9
+EPSILON_START = 1.0
 EPSILON_END = 0.0
 EPSILON_DECAY = 50000
 UPDATE_RATE = 0.005
@@ -74,13 +74,13 @@ class DQN(nn.Module):
 
         self.fully_connected_layers = Sequential(
             Flatten(),
-            Linear(in_features=16 * 8, out_features=32),
+            Linear(in_features=16 * 8, out_features=64),
             LeakyReLU(),
-            Linear(in_features=32, out_features=32),
+            Linear(in_features=64, out_features=64),
             LeakyReLU(),
-            Linear(in_features=32, out_features=16),
+            Linear(in_features=64, out_features=32),
             LeakyReLU(),
-            Linear(in_features=16, out_features=n_actions),
+            Linear(in_features=32, out_features=n_actions),
         )
 
     def forward(self, x):
@@ -99,8 +99,7 @@ optimizer = AdamW(policy_net.parameters(), lr=LEARNING_RATE, amsgrad=True)
 memory = ReplayMemory(REPLAY_MEMORY_CAPACITY)
 
 steps_done = 0
-episode_durations = []
-episode_scores = []
+episode_infos = []
 
 def select_action(state):
     epsilon_threshold = EPSILON_END + (EPSILON_START - EPSILON_END) * math.exp(-1. * steps_done / EPSILON_DECAY)
@@ -113,12 +112,12 @@ def select_action(state):
     
     return torch.tensor([[random.choice([0, 1, 2])]], device=device, dtype=torch.long)
 
-def plot_info(show_result=False):
+def plot_info(episode_infos):
     plt.figure(1)
     plt.title('Episode Scores')
     plt.xlabel('Episode')
     plt.ylabel('Score')
-    plt.plot(episode_scores)
+    plt.plot(list(map(lambda episode_info : episode_info.get('score'), episode_infos)))
     plt.show()
 
 def optimize_model():
@@ -194,16 +193,15 @@ def train(snakeGame):
 
             for key in policy_net_state_dict:
                 target_net_state_dict[key] = policy_net_state_dict[key] * UPDATE_RATE + target_net_state_dict[key] * (1 - UPDATE_RATE)
-            
             target_net.load_state_dict(target_net_state_dict)
 
             state = next_state
 
             if done:
-                print(f'Episode {episode}: {info}')
-                episode_durations.append(step + 1)
-                episode_scores.append(info.get('score'))
                 break
+
+        print(f'Episode {episode}: {info}')
+        episode_infos.append(info)
 
 # Run stuff
 
@@ -211,10 +209,7 @@ snakeGame = SnakeGame(width=BOARD_WIDTH-2, height=BOARD_HEIGHT-2, food_amount=1,
 
 train(snakeGame)
 
-episode_scores_second_half = episode_scores[NUM_EPISODES//2:]
-episode_scores_second_half_avg = sum(episode_scores_second_half) / (NUM_EPISODES//2)
+torch.save(policy_net.state_dict(), "policy_net_2.pth")
+torch.save(target_net.state_dict(), "target_net_2.pth")
 
-torch.save(policy_net.state_dict(), f"policy_net_avgscore{episode_scores_second_half_avg}.pth")
-torch.save(target_net.state_dict(), f"target_net_avgscore{episode_scores_second_half_avg}.pth")
-
-plot_info()
+plot_info(episode_infos)
