@@ -65,6 +65,24 @@ class ReplayMemory(object):
 def rgb2gray(rgb):
     return np.dot(rgb[...,:3], [0.2989, 0.5870, 0.1140])
 
+def rgb2Ints(rgb):
+    intBoard = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
+
+    for i in range(BOARD_HEIGHT):
+        for j in range(BOARD_WIDTH):
+            if (rgb[i][j] == [0.5, 0.5, 0.5]).all(): # border
+                intBoard[i][j] = 1
+            elif 0.01 <= rgb[i][j][1] <= 0.4: # grass
+                intBoard[i][j] = 2
+            elif (rgb[i][j] == [0.0, 1.0, 0.0]).all(): # apple
+                intBoard[i][j] = 3
+            elif (rgb[i][j] == [1.0, 1.0, 1.0]).all(): # head
+                intBoard[i][j] = 4
+            elif rgb[i][j][0] == 1.0: # body 
+                intBoard[i][j] = 5
+            
+    return intBoard
+
 # Models
 
 class DQN(nn.Module):
@@ -72,7 +90,7 @@ class DQN(nn.Module):
         super(DQN, self).__init__()
 
         self.convolutional_layers = Sequential(
-            Conv2d(in_channels=1, out_channels=4, kernel_size=3, padding=1),
+            Conv2d(in_channels=3, out_channels=4, kernel_size=3, padding=1),
             MaxPool2d(kernel_size=2, stride=2),
             
             Conv2d(in_channels=4, out_channels=8, kernel_size=3, padding=1),
@@ -91,6 +109,7 @@ class DQN(nn.Module):
         )
 
     def forward(self, x):
+        x = x.permute(0, 3, 1, 2)
         x = self.convolutional_layers(x)
         x = self.fully_connected_layers(x)
         return x 
@@ -180,8 +199,7 @@ def optimize_model():
 def train(snakeGame):
     for episode in range(NUM_EPISODES):
         state, reward, done, info = snakeGame.reset()
-        state = rgb2gray(state)
-        state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(0)
+        state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
 
         for step in range(MAX_STEPS):
             action = select_action(state)
@@ -189,8 +207,7 @@ def train(snakeGame):
             steps_done += 1
             next_state, reward, done, info = snakeGame.step(action.item() - 1)
 
-            next_state = rgb2gray(next_state)
-            next_state = torch.tensor(next_state, dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(0)
+            next_state = torch.tensor(next_state, dtype=torch.float32, device=device).unsqueeze(0)
             if done:
                 next_state = None
 
@@ -219,7 +236,7 @@ def train(snakeGame):
 
 # Run stuff
 
-snakeGame = SnakeGame(width=BOARD_WIDTH-2, height=BOARD_HEIGHT-2, food_amount=1, border=1, grass_growth=0.001, max_grass=0.05)
+snakeGame = SnakeGame(width=BOARD_WIDTH-2, height=BOARD_HEIGHT-2, food_amount=1, border=1, grass_growth=0.001, max_grass=0.01)
 
 train(snakeGame)
 
