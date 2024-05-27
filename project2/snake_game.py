@@ -82,6 +82,7 @@ class SnakeGame:
         self.grow_snake(self.direction)  # two steps: grow+remove last
         if self.snake[0] in self.apples:            
             self.apples.remove(self.snake[0])
+            self.apples_eaten += 1
             reward = 1
             self.create_apples()     # new apple
         else:
@@ -100,7 +101,7 @@ class SnakeGame:
             self.grass += self.grass_growth 
             self.grass[self.grass>self.max_grass] = self.max_grass
                 
-        return self.board_state(),reward,self.done, {'step': self.curr_step, 'score':self.score}
+        return self.board_state(),reward,self.done, {'step': self.curr_step, 'score':self.score, 'apples':self.apples_eaten}
 
     def get_state(self):
         "easily get current state (score, apple, snake head and tail)"        
@@ -135,6 +136,7 @@ class SnakeGame:
         self.score = 0
         self.done = False
         self.curr_step = 0
+        self.apples_eaten = 0
         self.create_snake()
         self.apples = []
         self.create_apples()

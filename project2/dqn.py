@@ -14,7 +14,9 @@ import torch.nn.functional as F
 from snake_game import SnakeGame
 from collections import namedtuple, deque
 import random
-from game_demo import plot_game, plot_state
+import numpy as np
+import torchvision.transforms.v2 as transforms
+from matplotlib.animation import FuncAnimation
 
 # Constants
 
@@ -58,6 +60,11 @@ class ReplayMemory(object):
     def __len__(self):
         return len(self.memory)
 
+# Preprocessing
+
+def rgb2gray(rgb):
+    return np.dot(rgb[...,:3], [0.2989, 0.5870, 0.1140])
+
 # Models
 
 class DQN(nn.Module):
@@ -65,10 +72,10 @@ class DQN(nn.Module):
         super(DQN, self).__init__()
 
         self.convolutional_layers = Sequential(
-            Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1),
+            Conv2d(in_channels=1, out_channels=4, kernel_size=3, padding=1),
             MaxPool2d(kernel_size=2, stride=2),
             
-            Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding=1),
+            Conv2d(in_channels=4, out_channels=8, kernel_size=3, padding=1),
             MaxPool2d(kernel_size=2, stride=2),
         )
 
@@ -84,11 +91,10 @@ class DQN(nn.Module):
         )
 
     def forward(self, x):
-        x = torch.permute(x, (0, 3, 1, 2))
         x = self.convolutional_layers(x)
         x = self.fully_connected_layers(x)
         return x 
-    
+
 # Training
 
 policy_net = DQN(N_OBSERVATIONS, N_ACTIONS).to(device)
@@ -112,8 +118,14 @@ def select_action(state):
     
     return torch.tensor([[random.choice([0, 1, 2])]], device=device, dtype=torch.long)
 
-def plot_info(episode_infos):
+def plot_board(board):
     plt.figure(1)
+    plt.ion()
+    plt.imshow(board, cmap='gray', vmin=0.0, vmax=1.0)
+    plt.pause(0.1)
+
+def plot_info(episode_infos):
+    plt.figure(2)
     plt.title('Episode Scores')
     plt.xlabel('Episode')
     plt.ylabel('Score')
@@ -168,7 +180,8 @@ def optimize_model():
 def train(snakeGame):
     for episode in range(NUM_EPISODES):
         state, reward, done, info = snakeGame.reset()
-        state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
+        state = rgb2gray(state)
+        state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(0)
 
         for step in range(MAX_STEPS):
             action = select_action(state)
@@ -176,7 +189,8 @@ def train(snakeGame):
             steps_done += 1
             next_state, reward, done, info = snakeGame.step(action.item() - 1)
 
-            next_state = torch.tensor(next_state, dtype=torch.float32, device=device).unsqueeze(0)
+            next_state = rgb2gray(next_state)
+            next_state = torch.tensor(next_state, dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(0)
             if done:
                 next_state = None
 
