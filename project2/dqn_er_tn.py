@@ -74,8 +74,6 @@ class DQN(nn.Module):
 # Training
 
 policy_net = DQN(N_OBSERVATIONS, N_ACTIONS).to(device)
-target_net = DQN(N_OBSERVATIONS, N_ACTIONS).to(device)
-target_net.load_state_dict(policy_net.state_dict())
 
 optimizer = AdamW(policy_net.parameters(), lr=LEARNING_RATE, amsgrad=True)
 memory = ReplayMemory(REPLAY_MEMORY_CAPACITY)
@@ -108,7 +106,7 @@ def optimize_model(state, action, next_state, reward):
     next_state_value = torch.zeros(1, device=device)
     if next_state is not None:
         with torch.no_grad():
-            next_state_value = target_net(next_state).max(1).values
+            next_state_value = policy_net(next_state).max(1).values
 
     expected_state_action_value = (next_state_value * GAMMA) + reward
 
@@ -136,18 +134,7 @@ def train(snakeGame):
                 next_state = None
 
             reward = torch.tensor([reward], device=device)
-
             optimize_model(state, action, next_state, reward)
-
-            # Soft update of the target network's weights
-            # θ′ ← τ θ + (1 −τ )θ′
-            target_net_state_dict = target_net.state_dict()
-            policy_net_state_dict = policy_net.state_dict()
-
-            for key in policy_net_state_dict:
-                target_net_state_dict[key] = policy_net_state_dict[key] * UPDATE_RATE + target_net_state_dict[key] * (1 - UPDATE_RATE)
-            target_net.load_state_dict(target_net_state_dict)
-
             state = next_state
 
             if done:

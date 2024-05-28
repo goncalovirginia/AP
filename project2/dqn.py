@@ -18,6 +18,7 @@ import numpy as np
 import torchvision.transforms.v2 as transforms
 from matplotlib.animation import FuncAnimation
 from models import DQN
+from replay_memory import Transition, ReplayMemory
 
 # Constants
 
@@ -41,48 +42,6 @@ REPLAY_MEMORY_CAPACITY = 10000
 
 device = torch.device("cuda" if USE_GPU and torch.cuda.is_available() else "cpu")
 print(f'Device: {device}')
-
-#Replay Memory
-
-Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
-
-class ReplayMemory(object):
-
-    def __init__(self, capacity):
-        self.memory = deque([], maxlen=capacity)
-
-    def push(self, *args):
-        """Save a transition"""
-        self.memory.append(Transition(*args))
-
-    def sample(self, batch_size):
-        return random.sample(self.memory, batch_size)
-
-    def __len__(self):
-        return len(self.memory)
-
-# Preprocessing
-
-def rgb2gray(rgb):
-    return np.dot(rgb[...,:3], [0.2989, 0.5870, 0.1140])
-
-def rgb2Ints(rgb):
-    intBoard = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
-
-    for i in range(BOARD_HEIGHT):
-        for j in range(BOARD_WIDTH):
-            if (rgb[i][j] == [0.5, 0.5, 0.5]).all(): # border
-                intBoard[i][j] = 1
-            elif 0.01 <= rgb[i][j][1] <= 0.4: # grass
-                intBoard[i][j] = 2
-            elif (rgb[i][j] == [0.0, 1.0, 0.0]).all(): # apple
-                intBoard[i][j] = 3
-            elif (rgb[i][j] == [1.0, 1.0, 1.0]).all(): # head
-                intBoard[i][j] = 4
-            elif rgb[i][j][0] == 1.0: # body 
-                intBoard[i][j] = 5
-            
-    return intBoard
 
 # Training
 
