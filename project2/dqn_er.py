@@ -14,7 +14,7 @@ import torch.nn.functional as F
 from snake_game import SnakeGame
 from collections import namedtuple, deque
 import random
-from game_demo import plot_game, plot_state
+from models import DQN
 
 # Constants
 
