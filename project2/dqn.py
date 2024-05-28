@@ -35,7 +35,7 @@ BATCH_SIZE = 128
 GAMMA = 0.99
 EPSILON_START = 1.0
 EPSILON_END = 0.1
-EPSILON_DECAY = 100000
+EPSILON_DECAY = 5000
 UPDATE_RATE = 0.005
 LEARNING_RATE = 0.001
 REPLAY_MEMORY_CAPACITY = 10000
@@ -58,7 +58,7 @@ steps_done = 0
 episode_infos = []
 
 def select_action(state):
-    epsilon_threshold = EPSILON_END + (EPSILON_START - EPSILON_END) * math.exp(-1. * steps_done / EPSILON_DECAY)
+    epsilon_threshold = EPSILON_END + (EPSILON_START - EPSILON_END) * math.exp(-1. * len(episode_infos) / EPSILON_DECAY)
 
     if random.random() > epsilon_threshold:
         with torch.no_grad():
@@ -69,7 +69,7 @@ def select_action(state):
     return torch.tensor([[random.choice([0, 1, 2])]], device=device, dtype=torch.long)
 
 def select_action_astar(state, state_info):
-    epsilon_threshold = EPSILON_END + (EPSILON_START - EPSILON_END) * math.exp(-1. * steps_done / EPSILON_DECAY)
+    epsilon_threshold = EPSILON_END + (EPSILON_START - EPSILON_END) * math.exp(-1. * len(episode_infos) / EPSILON_DECAY)
 
     if random.random() > epsilon_threshold:
         with torch.no_grad():
