@@ -16,6 +16,7 @@ from collections import namedtuple, deque
 import random
 from models import DQN
 from replay_memory import Transition, ReplayMemory
+from plotting import plot_info
 
 # Constants
 
@@ -93,14 +94,6 @@ def select_action(state):
             return policy_net(state).max(1).indices.view(1, 1)
     
     return torch.tensor([[random.choice([0, 1, 2])]], device=device, dtype=torch.long)
-
-def plot_info(episode_infos):
-    plt.figure(1)
-    plt.title('Episode Scores')
-    plt.xlabel('Episode')
-    plt.ylabel('Score')
-    plt.plot(list(map(lambda episode_info : episode_info.get('score'), episode_infos)))
-    plt.show()
 
 def optimize_model(state, action, next_state, reward): 
     state_action_value = policy_net(state).gather(1, action)

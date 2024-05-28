@@ -19,6 +19,8 @@ import torchvision.transforms.v2 as transforms
 from matplotlib.animation import FuncAnimation
 from models import DQN
 from replay_memory import Transition, ReplayMemory
+from plotting import plot_info, plot_board
+from astar import astar, boardToMaze, closestApple, coordsToMove, nextDirection, nextMove
 
 # Constants
 
@@ -66,19 +68,25 @@ def select_action(state):
     
     return torch.tensor([[random.choice([0, 1, 2])]], device=device, dtype=torch.long)
 
-def plot_board(board):
-    plt.figure(1)
-    plt.ion()
-    plt.imshow(board, cmap='gray', vmin=0.0, vmax=1.0)
-    plt.pause(0.1)
+def select_action_astar(state, state_info):
+    epsilon_threshold = EPSILON_END + (EPSILON_START - EPSILON_END) * math.exp(-1. * steps_done / EPSILON_DECAY)
 
-def plot_info(episode_infos):
-    plt.figure(2)
-    plt.title('Episode Scores')
-    plt.xlabel('Episode')
-    plt.ylabel('Score')
-    plt.plot(list(map(lambda episode_info : episode_info.get('score'), episode_infos)))
-    plt.show()
+    if random.random() > epsilon_threshold:
+        with torch.no_grad():
+            # t.max(1) will return the largest column value of each row.
+            # second column on max result is index of where max element was found, so we pick action with the larger expected reward.
+            return policy_net(state).max(1).indices.view(1, 1)
+    
+    maze = boardToMaze(state, state_info)
+    closest_apple = closestApple(state_info[2], state_info[1])
+    next_coords = astar(maze, state_info[2], closest_apple)[1]
+
+    if next_coords[0] == -1:
+        next_move = random.choice([0, 1, 2])
+    else:
+        next_move = coordsToMove(state_info[2], next_coords, state_info[4]) + 1
+
+    return torch.tensor([[next_move]], device=device, dtype=torch.long)
 
 def optimize_model():
     if len(memory) < BATCH_SIZE:
@@ -115,10 +123,12 @@ def train(snakeGame):
         state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
 
         for step in range(MAX_STEPS):
-            action = select_action(state)
+            #action = select_action(state)
+            action = select_action_astar(state, snakeGame.get_state())
             global steps_done
             steps_done += 1
             next_state, reward, done, info = snakeGame.step(action.item() - 1)
+            #plot_board(next_state)
 
             next_state = torch.tensor(next_state, dtype=torch.float32, device=device).unsqueeze(0)
             if done:

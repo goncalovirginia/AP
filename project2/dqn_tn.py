@@ -19,6 +19,7 @@ import torchvision.transforms.v2 as transforms
 from matplotlib.animation import FuncAnimation
 from models import DQN
 from replay_memory import Transition, ReplayMemory
+from plotting import plot_info
 
 # Constants
 
