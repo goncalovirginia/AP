@@ -14,9 +14,7 @@ import torch.nn.functional as F
 from snake_game import SnakeGame
 from collections import namedtuple, deque
 import random
-import numpy as np
-import torchvision.transforms.v2 as transforms
-from matplotlib.animation import FuncAnimation
+from game_demo import plot_game, plot_state
 
 # Constants
 
@@ -60,29 +58,6 @@ class ReplayMemory(object):
     def __len__(self):
         return len(self.memory)
 
-# Preprocessing
-
-def rgb2gray(rgb):
-    return np.dot(rgb[...,:3], [0.2989, 0.5870, 0.1140])
-
-def rgb2Ints(rgb):
-    intBoard = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
-
-    for i in range(BOARD_HEIGHT):
-        for j in range(BOARD_WIDTH):
-            if (rgb[i][j] == [0.5, 0.5, 0.5]).all(): # border
-                intBoard[i][j] = 1
-            elif 0.01 <= rgb[i][j][1] <= 0.4: # grass
-                intBoard[i][j] = 2
-            elif (rgb[i][j] == [0.0, 1.0, 0.0]).all(): # apple
-                intBoard[i][j] = 3
-            elif (rgb[i][j] == [1.0, 1.0, 1.0]).all(): # head
-                intBoard[i][j] = 4
-            elif rgb[i][j][0] == 1.0: # body 
-                intBoard[i][j] = 5
-            
-    return intBoard
-
 # Models
 
 class DQN(nn.Module):
@@ -90,10 +65,10 @@ class DQN(nn.Module):
         super(DQN, self).__init__()
 
         self.convolutional_layers = Sequential(
-            Conv2d(in_channels=3, out_channels=4, kernel_size=3, padding=1),
+            Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1),
             MaxPool2d(kernel_size=2, stride=2),
             
-            Conv2d(in_channels=4, out_channels=8, kernel_size=3, padding=1),
+            Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding=1),
             MaxPool2d(kernel_size=2, stride=2),
         )
 
@@ -109,11 +84,11 @@ class DQN(nn.Module):
         )
 
     def forward(self, x):
-        x = x.permute(0, 3, 1, 2)
+        x = torch.permute(x, (0, 3, 1, 2))
         x = self.convolutional_layers(x)
         x = self.fully_connected_layers(x)
         return x 
-
+    
 # Training
 
 policy_net = DQN(N_OBSERVATIONS, N_ACTIONS).to(device)
@@ -137,43 +112,26 @@ def select_action(state):
     
     return torch.tensor([[random.choice([0, 1, 2])]], device=device, dtype=torch.long)
 
-def plot_board(board):
-    plt.figure(1)
-    plt.ion()
-    plt.imshow(board, cmap='gray', vmin=0.0, vmax=1.0)
-    plt.pause(0.1)
-
 def plot_info(episode_infos):
-    plt.figure(2)
+    plt.figure(1)
     plt.title('Episode Scores')
     plt.xlabel('Episode')
     plt.ylabel('Score')
     plt.plot(list(map(lambda episode_info : episode_info.get('score'), episode_infos)))
     plt.show()
 
-def optimize_model():
-    if len(memory) < BATCH_SIZE:
-        return
-    
-    transitions = memory.sample(BATCH_SIZE)
-    batch = Transition(*zip(*transitions))
+def optimize_model(state, action, next_state, reward): 
+    state_action_value = policy_net(state).gather(1, action)
 
-    non_final_mask = torch.tensor(tuple(map(lambda s: s is not None, batch.next_state)), device=device, dtype=torch.bool)
-    non_final_next_states = torch.cat([s for s in batch.next_state if s is not None])
-    state_batch = torch.cat(batch.state)
-    action_batch = torch.cat(batch.action)
-    reward_batch = torch.cat(batch.reward)
+    next_state_value = torch.zeros(1, device=device)
+    if next_state is not None:
+        with torch.no_grad():
+            next_state_value = target_net(next_state).max(1).values
 
-    state_action_values = policy_net(state_batch).gather(1, action_batch)
-
-    next_state_values = torch.zeros(BATCH_SIZE, device=device)
-    with torch.no_grad():
-        next_state_values[non_final_mask] = target_net(non_final_next_states).max(1).values
-
-    expected_state_action_values = (next_state_values * GAMMA) + reward_batch
+    expected_state_action_value = (next_state_value * GAMMA) + reward
 
     criterion = nn.SmoothL1Loss()
-    loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
+    loss = criterion(state_action_value, expected_state_action_value.unsqueeze(1))
 
     optimizer.zero_grad()
     loss.backward()
@@ -197,9 +155,7 @@ def train(snakeGame):
 
             reward = torch.tensor([reward], device=device)
 
-            memory.push(state, action, next_state, reward)
-
-            optimize_model()
+            optimize_model(state, action, next_state, reward)
 
             # Soft update of the target network's weights
             # θ′ ← τ θ + (1 −τ )θ′
@@ -220,7 +176,7 @@ def train(snakeGame):
 
 # Run stuff
 
-snakeGame = SnakeGame(width=BOARD_WIDTH-2, height=BOARD_HEIGHT-2, food_amount=1, border=1, grass_growth=0.001, max_grass=0.01)
+snakeGame = SnakeGame(width=BOARD_WIDTH-2, height=BOARD_HEIGHT-2, food_amount=1, border=1, grass_growth=0.001, max_grass=0.05)
 
 train(snakeGame)
 
