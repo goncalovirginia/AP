@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 from torch.nn import LayerNorm, Linear, ReLU, LeakyReLU, Sequential, Flatten, Conv2d, MaxPool2d
 import torch.optim as optim
-from torch.optim import AdamW
+from torch.optim import AdamW, Adam
 import torch.nn.functional as F
 from snake_game import SnakeGame
 from collections import namedtuple, deque
@@ -33,9 +33,9 @@ NUM_EPISODES = 10000
 MAX_STEPS = 1000
 BATCH_SIZE = 128
 GAMMA = 0.99
-EPSILON_START = 1.0
+EPSILON_START = 0.9
 EPSILON_END = 0.1
-EPSILON_DECAY = 5000
+EPSILON_DECAY = 2000
 UPDATE_RATE = 0.005
 LEARNING_RATE = 0.001
 REPLAY_MEMORY_CAPACITY = 10000
@@ -51,7 +51,7 @@ policy_net = DQN(N_OBSERVATIONS, N_ACTIONS).to(device)
 target_net = DQN(N_OBSERVATIONS, N_ACTIONS).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 
-optimizer = AdamW(policy_net.parameters(), lr=LEARNING_RATE, amsgrad=True)
+optimizer = Adam(policy_net.parameters(), lr=LEARNING_RATE, amsgrad=True)
 memory = ReplayMemory(REPLAY_MEMORY_CAPACITY)
 
 steps_done = 0
@@ -69,7 +69,7 @@ def select_action(state):
     return torch.tensor([[random.choice([0, 1, 2])]], device=device, dtype=torch.long)
 
 def select_action_astar(state, state_info):
-    epsilon_threshold = EPSILON_END + (EPSILON_START - EPSILON_END) * math.exp(-1. * len(episode_infos) / EPSILON_DECAY)
+    epsilon_threshold = EPSILON_END + (EPSILON_START - EPSILON_END) * math.exp(-1. * (len(episode_infos) - 2000) / EPSILON_DECAY)
 
     if random.random() > epsilon_threshold:
         with torch.no_grad():
@@ -123,8 +123,7 @@ def train(snakeGame):
         state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
 
         for step in range(MAX_STEPS):
-            #action = select_action(state)
-            action = select_action_astar(state, snakeGame.get_state())
+            action = select_action(state) if len(episode_infos) < 5000 else select_action_astar(state, snakeGame.get_state())
             global steps_done
             steps_done += 1
             next_state, reward, done, info = snakeGame.step(action.item() - 1)
@@ -159,11 +158,11 @@ def train(snakeGame):
 
 # Run stuff
 
-snakeGame = SnakeGame(width=BOARD_WIDTH-2, height=BOARD_HEIGHT-2, food_amount=1, border=1, grass_growth=0.001, max_grass=0.01)
+snakeGame = SnakeGame(width=BOARD_WIDTH-2, height=BOARD_HEIGHT-2, food_amount=1, border=1, grass_growth=0.001, max_grass=0.05)
 
 train(snakeGame)
 
-torch.save(policy_net.state_dict(), "policy_net_2.pth")
-torch.save(target_net.state_dict(), "target_net_2.pth")
+torch.save(policy_net.state_dict(), "policy_net_conv4x8x16_mixed.pth")
+torch.save(target_net.state_dict(), "target_net_conv4x8x16_mixed.pth")
 
 plot_info(episode_infos)

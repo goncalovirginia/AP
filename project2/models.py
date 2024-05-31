@@ -7,16 +7,16 @@ class DQN(nn.Module):
         super(DQN, self).__init__()
 
         self.convolutional_layers = Sequential(
-            Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1),
+            Conv2d(in_channels=3, out_channels=4, kernel_size=3, padding=1),
             MaxPool2d(kernel_size=2, stride=2),
             
-            Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding=1),
+            Conv2d(in_channels=4, out_channels=4, kernel_size=3, padding=1),
             MaxPool2d(kernel_size=2, stride=2),
         )
 
         self.fully_connected_layers = Sequential(
             Flatten(),
-            Linear(in_features=16 * 8, out_features=64),
+            Linear(in_features=16 * 4, out_features=64),
             LeakyReLU(),
             Linear(in_features=64, out_features=64),
             LeakyReLU(),
